@@ -1645,17 +1645,57 @@ export class RenderPipeline {
     this.countdownCallback = onComplete;
     this.countdownContainer = new Container();
 
+    const centerX = this.config.width / 2;
+    const centerY = this.config.height / 2;
+
+    // Semi-transparent background overlay
+    const overlay = new Graphics();
+    overlay.rect(0, 0, this.config.width, this.config.height);
+    overlay.fill({ color: 0x0D0221, alpha: 0.7 });
+    this.countdownContainer.addChild(overlay);
+
+    // Animated radial pulse rings
+    const pulseContainer = new Container();
+    pulseContainer.position.set(centerX, centerY);
+    this.countdownContainer.addChild(pulseContainer);
+
+    // Create multiple pulse rings
+    const pulseRings: Graphics[] = [];
+    for (let i = 0; i < 3; i++) {
+      const ring = new Graphics();
+      ring.circle(0, 0, 50);
+      ring.stroke({ color: 0x00FFFF, width: 3, alpha: 0.8 });
+      ring.scale.set(0);
+      ring.alpha = 0;
+      pulseRings.push(ring);
+      pulseContainer.addChild(ring);
+    }
+
+    // "GET READY" subtitle
+    const subtitleStyle = new TextStyle({
+      fontFamily: '"Orbitron", sans-serif',
+      fontSize: 24,
+      fill: 0xFF00FF,
+      letterSpacing: 8,
+    });
+    const subtitleText = new Text({ text: 'GET READY', style: subtitleStyle });
+    subtitleText.anchor.set(0.5);
+    subtitleText.position.set(centerX, centerY - 120);
+    subtitleText.alpha = 0.8;
+    this.countdownContainer.addChild(subtitleText);
+
     // Create bright, glowing countdown text style
     const countdownStyle = new TextStyle({
       fontFamily: '"Press Start 2P", monospace',
-      fontSize: 140,
+      fontSize: 160,
       fill: 0x00FFFF,
-      stroke: { color: 0x000000, width: 8 },
+      stroke: { color: 0x000000, width: 10 },
       dropShadow: {
         color: 0x00FFFF,
-        blur: 30,
+        blur: 40,
         alpha: 1,
         distance: 0,
+        angle: 0,
       },
     });
 
@@ -1664,11 +1704,61 @@ export class RenderPipeline {
       style: countdownStyle,
     });
     countdownText.anchor.set(0.5);
-    countdownText.position.set(this.config.width / 2, this.config.height / 2);
+    countdownText.position.set(centerX, centerY);
     this.countdownContainer.addChild(countdownText);
+
+    // Decorative corner brackets
+    const bracketGraphics = new Graphics();
+    const bracketSize = 40;
+    const bracketOffset = 180;
+    const bracketColor = 0xFF00FF;
+
+    // Top-left bracket
+    bracketGraphics.moveTo(centerX - bracketOffset, centerY - bracketOffset + bracketSize);
+    bracketGraphics.lineTo(centerX - bracketOffset, centerY - bracketOffset);
+    bracketGraphics.lineTo(centerX - bracketOffset + bracketSize, centerY - bracketOffset);
+
+    // Top-right bracket
+    bracketGraphics.moveTo(centerX + bracketOffset - bracketSize, centerY - bracketOffset);
+    bracketGraphics.lineTo(centerX + bracketOffset, centerY - bracketOffset);
+    bracketGraphics.lineTo(centerX + bracketOffset, centerY - bracketOffset + bracketSize);
+
+    // Bottom-left bracket
+    bracketGraphics.moveTo(centerX - bracketOffset, centerY + bracketOffset - bracketSize);
+    bracketGraphics.lineTo(centerX - bracketOffset, centerY + bracketOffset);
+    bracketGraphics.lineTo(centerX - bracketOffset + bracketSize, centerY + bracketOffset);
+
+    // Bottom-right bracket
+    bracketGraphics.moveTo(centerX + bracketOffset - bracketSize, centerY + bracketOffset);
+    bracketGraphics.lineTo(centerX + bracketOffset, centerY + bracketOffset);
+    bracketGraphics.lineTo(centerX + bracketOffset, centerY + bracketOffset - bracketSize);
+
+    bracketGraphics.stroke({ color: bracketColor, width: 4, alpha: 0.8 });
+    this.countdownContainer.addChild(bracketGraphics);
 
     // Add directly to stage at the very top (above screen effects/transitions)
     this.app.stage.addChild(this.countdownContainer);
+
+    // Pulse ring animation
+    let pulseTime = 0;
+    const animatePulse = () => {
+      if (!this.countdownContainer) return;
+      pulseTime += 16;
+
+      pulseRings.forEach((ring, i) => {
+        const offset = i * 200;
+        const progress = ((pulseTime + offset) % 700) / 700;
+        ring.scale.set(1 + progress * 4);
+        ring.alpha = Math.max(0, 0.6 - progress * 0.8);
+      });
+
+      // Subtle bracket pulse
+      const pulse = Math.sin(pulseTime * 0.008) * 0.2 + 0.8;
+      bracketGraphics.alpha = pulse;
+
+      requestAnimationFrame(animatePulse);
+    };
+    animatePulse();
 
     // Countdown sequence
     const counts = ['3', '2', '1', 'GO!'];
@@ -1677,15 +1767,18 @@ export class RenderPipeline {
     const updateCount = () => {
       if (!this.countdownContainer) return;
 
-      // Scale animation - start big
-      countdownText.scale.set(1.8);
+      // Scale animation - dramatic zoom in
+      countdownText.scale.set(2.5);
       countdownText.alpha = 1;
+      countdownText.rotation = -0.1;
 
       const animateOut = () => {
-        if (countdownText && countdownText.alpha > 0.3) {
-          countdownText.scale.x -= 0.04;
-          countdownText.scale.y -= 0.04;
-          countdownText.alpha -= 0.03;
+        if (!countdownText || !this.countdownContainer) return;
+        if (countdownText.scale.x > 0.8) {
+          countdownText.scale.x -= 0.08;
+          countdownText.scale.y -= 0.08;
+          countdownText.rotation += 0.005;
+          countdownText.alpha = Math.max(0.3, countdownText.alpha - 0.02);
           requestAnimationFrame(animateOut);
         }
       };
@@ -1694,17 +1787,25 @@ export class RenderPipeline {
       countIndex++;
       if (countIndex < counts.length) {
         setTimeout(() => {
-          if (countdownText) {
+          if (countdownText && this.countdownContainer) {
             countdownText.text = counts[countIndex];
             if (counts[countIndex] === 'GO!') {
-              countdownText.style.fill = 0xFF00FF;
+              // Epic color change for GO!
+              countdownText.style.fill = 0x00FF00;
               countdownText.style.dropShadow = {
-                color: 0xFF00FF,
-                blur: 30,
+                color: 0x00FF00,
+                blur: 50,
                 alpha: 1,
                 distance: 0,
                 angle: 0,
               };
+              subtitleText.text = 'FIGHT!';
+              subtitleText.style.fill = 0x00FF00;
+
+              // Flash effect
+              overlay.clear();
+              overlay.rect(0, 0, this.config.width, this.config.height);
+              overlay.fill({ color: 0x00FF00, alpha: 0.3 });
             }
             updateCount();
           }

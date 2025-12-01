@@ -17,6 +17,12 @@ interface MusicConfig {
   crossfadeDuration: number; // seconds
 }
 
+interface SpecialTracks {
+  highScore?: string;
+  gameOver?: string;
+  menu?: string;
+}
+
 /**
  * Music Manager class - handles background music playback
  */
@@ -49,18 +55,22 @@ export class MusicManager {
    */
   private async loadTrackList(): Promise<void> {
     try {
+      // Get base URL for Vite (handles different deployment paths like /Tetris/)
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const musicPath = `${baseUrl}music/`.replace(/\/\//g, '/');
+
       // Try to fetch the track list from a manifest or scan directory
       // Since we can't dynamically scan directories in browser, we'll use a different approach:
       // The user can put tracks in public/music/ and we'll try common names or use a manifest
 
       // First try to load a manifest file
-      const manifestResponse = await fetch('/music/playlist.json').catch(() => null);
+      const manifestResponse = await fetch(`${musicPath}playlist.json`).catch(() => null);
 
       if (manifestResponse?.ok) {
         const manifest = await manifestResponse.json();
         this.tracks = manifest.tracks.map((name: string) => ({
           name: name.replace(/\.mp3$/i, ''),
-          url: `/music/${name}`,
+          url: `${musicPath}${name}`,
           audio: null,
         }));
       } else {
@@ -94,6 +104,10 @@ export class MusicManager {
    * Try to detect tracks by attempting to load common filenames
    */
   private async detectTracks(): Promise<void> {
+    // Get base URL for Vite (handles different deployment paths like /Tetris/)
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const musicPath = `${baseUrl}music/`.replace(/\/\//g, '/');
+
     // Try numbered tracks (track1.mp3, track2.mp3, etc.)
     const potentialTracks: string[] = [];
 
@@ -121,7 +135,7 @@ export class MusicManager {
 
     for (const trackName of potentialTracks) {
       try {
-        const response = await fetch(`/music/${trackName}`, { method: 'HEAD' });
+        const response = await fetch(`${musicPath}${trackName}`, { method: 'HEAD' });
         if (response.ok) {
           foundTracks.push(trackName);
         }
@@ -132,7 +146,7 @@ export class MusicManager {
 
     this.tracks = foundTracks.map((name) => ({
       name: name.replace(/\.mp3$/i, ''),
-      url: `/music/${name}`,
+      url: `${musicPath}${name}`,
       audio: null,
     }));
   }
