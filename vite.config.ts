@@ -3,6 +3,7 @@ import glsl from 'vite-plugin-glsl';
 import { resolve } from 'path';
 
 export default defineConfig({
+  base: '/Tetris/',
   plugins: [
     glsl({
       include: [
