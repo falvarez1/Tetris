@@ -1,0 +1,33 @@
+{
+  "name": "tetris-vfx",
+  "version": "1.0.0",
+  "description": "A visually stunning Tetris-style game with advanced WebGL shader effects and multiple visual themes",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@pixi/particle-emitter": "^5.0.8",
+    "howler": "^2.2.4",
+    "pixi.js": "^8.6.6",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@rollup/pluginutils": "^5.3.0",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vite-plugin-glsl": "^1.3.0"
+  },
+  "keywords": [
+    "tetris",
+    "game",
+    "webgl",
+    "pixi.js",
+    "shaders",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": ""
+}

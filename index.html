@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetris VFX</title>
+    <!-- Google Fonts - Retro game fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #0D0221;
+      }
+
+      #game-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      /* Hide default focus outlines on canvas */
+      canvas:focus {
+        outline: none;
+      }
+
+      /* Loading screen */
+      #loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #0D0221;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        font-family: 'Orbitron', sans-serif;
+        color: #FF00FF;
+      }
+
+      #loading h1 {
+        font-size: 2.5rem;
+        font-weight: 900;
+        letter-spacing: 0.3em;
+        text-shadow: 0 0 20px #FF00FF, 0 0 40px #FF00FF, 0 0 60px #FF00FF;
+        margin-bottom: 2rem;
+      }
+
+      .loading-bar {
+        width: 300px;
+        height: 4px;
+        background: rgba(255, 0, 255, 0.2);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .loading-bar-inner {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #FF00FF, #00FFFF);
+        animation: loading 2s ease-in-out infinite;
+      }
+
+      @keyframes loading {
+        0% { width: 0%; margin-left: 0; }
+        50% { width: 100%; margin-left: 0; }
+        100% { width: 0%; margin-left: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <h1>TETRIS VFX</h1>
+      <div class="loading-bar">
+        <div class="loading-bar-inner"></div>
+      </div>
+    </div>
+    <div id="game-container"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
