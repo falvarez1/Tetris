@@ -48,6 +48,7 @@ export class MusicManager {
   private specialAudio: HTMLAudioElement | null = null;
   private isPlayingSpecial: boolean = false;
   private musicPath: string = '/music/';
+  private pendingSpecial: 'highScore' | 'gameOver' | 'menu' | null = null;
 
   // Bound method reference for event listener cleanup
   private onTrackEndedBound: () => void;
@@ -102,6 +103,13 @@ export class MusicManager {
         if (this.pendingPlay) {
           this.pendingPlay = false;
           this.play();
+        }
+
+        // If special track was requested before tracks loaded, start now
+        if (this.pendingSpecial) {
+          const pending = this.pendingSpecial;
+          this.pendingSpecial = null;
+          this.playSpecial(pending);
         }
       } else {
         console.log('Music Manager: No tracks found in public/music/');
@@ -344,6 +352,13 @@ export class MusicManager {
   async playSpecial(type: 'highScore' | 'gameOver' | 'menu'): Promise<void> {
     if (!this.config.enabled) return;
 
+    // If tracks aren't loaded yet, queue the request
+    if (!this.tracksLoaded) {
+      console.log(`Music Manager: Tracks not loaded yet, queuing special track '${type}'...`);
+      this.pendingSpecial = type;
+      return;
+    }
+
     const trackName = this.specialTracks[type];
     if (!trackName) {
       console.log(`Music Manager: No special track configured for '${type}'`);
@@ -364,8 +379,31 @@ export class MusicManager {
     console.log(`Playing special track: ${trackName}`);
 
     await this.specialAudio.play().catch((e) => {
-      console.warn(`Failed to play special track '${type}':`, e);
-      this.isPlayingSpecial = false;
+      console.warn(`Failed to play special track '${type}' (autoplay blocked?):`, e);
+      console.log('Click anywhere on the page to enable music');
+
+      // Add one-time click handler to resume music
+      const resumeOnClick = () => {
+        document.removeEventListener('click', resumeOnClick);
+        document.removeEventListener('keydown', resumeOnKey);
+        if (this.specialAudio && this.isPlayingSpecial) {
+          this.specialAudio.play().catch(() => {
+            // Still failed, give up
+            this.isPlayingSpecial = false;
+          });
+        }
+      };
+      const resumeOnKey = () => {
+        document.removeEventListener('click', resumeOnClick);
+        document.removeEventListener('keydown', resumeOnKey);
+        if (this.specialAudio && this.isPlayingSpecial) {
+          this.specialAudio.play().catch(() => {
+            this.isPlayingSpecial = false;
+          });
+        }
+      };
+      document.addEventListener('click', resumeOnClick);
+      document.addEventListener('keydown', resumeOnKey);
     });
   }
 

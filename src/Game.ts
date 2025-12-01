@@ -792,6 +792,17 @@ export class Game {
       return;
     }
 
+    // Clear any pending high score entry timeout
+    if (this.nameEntryTimeoutId) {
+      clearTimeout(this.nameEntryTimeoutId);
+      this.nameEntryTimeoutId = null;
+    }
+    this.pendingHighScore = null;
+
+    // Hide any open leaderboard UI
+    this.renderer.hideNameEntry();
+    this.renderer.hideLeaderboard();
+
     this.state = resetGameState(this.state, this.config);
 
     // Reset renderer (clears game over overlay and resets tracking state)
@@ -801,6 +812,9 @@ export class Game {
     const result = startGame(this.state, this.config);
     this.state = result.state;
     this.eventBus.emitAll(result.events);
+
+    // Stop any special music (high score, etc.) before playing regular music
+    this.musicManager.stopSpecial(false);
 
     // Play next track on restart
     this.musicManager.next();
