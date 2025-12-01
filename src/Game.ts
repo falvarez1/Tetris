@@ -139,10 +139,12 @@ export class Game {
     this.renderer.hideNameEntry();
     this.renderer.hideLeaderboard();
 
-    // Reset music speed
+    // Stop any special music (don't resume - showMainMenu will play menu music)
+    this.musicManager.stopSpecial(false);
+    this.musicManager.stop();
     this.musicManager.resetPlaybackRate();
 
-    // Show main menu
+    // Show main menu (will start menu music)
     this.showMainMenu();
   }
 
@@ -168,7 +170,11 @@ export class Game {
    * Toggle music playback
    */
   toggleMusic(): void {
-    if (this.musicManager.getIsPlaying()) {
+    // Don't toggle music while entering name (M key is used for typing)
+    if (this.renderer.isNameEntryVisible()) {
+      return;
+    }
+    if (this.musicManager.getIsPlaying() || this.musicManager.getIsPlayingSpecial()) {
       this.musicManager.pause();
       console.log('Music paused');
     } else {
@@ -181,6 +187,10 @@ export class Game {
    * Skip to next track
    */
   nextTrack(): void {
+    // Don't skip track while entering name (N key is used for typing)
+    if (this.renderer.isNameEntryVisible()) {
+      return;
+    }
     this.musicManager.next();
     console.log('Next track');
   }
@@ -346,8 +356,8 @@ export class Game {
   showMainMenu(): void {
     this.appPhase = 'menu';
     this.renderer.showMainMenu();
-    // Start music for menu
-    this.musicManager.play();
+    // Play intro/menu music
+    this.musicManager.playSpecial('menu');
   }
 
   /**
@@ -367,6 +377,9 @@ export class Game {
     // Hide any open leaderboard UI
     this.renderer.hideNameEntry();
     this.renderer.hideLeaderboard();
+
+    // Stop any special music (like high score music) and resume regular music
+    this.musicManager.stopSpecial(true);
 
     // Create new game state for selected mode
     this.state = createGameState(mode, this.config);
@@ -558,6 +571,8 @@ export class Game {
         this.nameEntryTimeoutId = setTimeout(() => {
           // Only show if game is still in gameOver phase (user hasn't restarted)
           if (this.state.phase === 'gameOver' && this.pendingHighScore) {
+            // Play high score music
+            this.musicManager.playSpecial('highScore');
             this.renderer.showNameEntry(e.finalScore, rank);
           }
           this.nameEntryTimeoutId = null;

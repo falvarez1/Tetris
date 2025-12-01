@@ -44,8 +44,16 @@ export class MusicManager {
   private shuffledIndices: number[] = [];
   private tracksLoaded: boolean = false;
   private pendingPlay: boolean = false;
+  private specialTracks: SpecialTracks = {};
+  private specialAudio: HTMLAudioElement | null = null;
+  private isPlayingSpecial: boolean = false;
+  private musicPath: string = '/music/';
+
+  // Bound method reference for event listener cleanup
+  private onTrackEndedBound: () => void;
 
   constructor() {
+    this.onTrackEndedBound = this.onTrackEnded.bind(this);
     this.loadTrackList();
   }
 
@@ -57,22 +65,27 @@ export class MusicManager {
     try {
       // Get base URL for Vite (handles different deployment paths like /Tetris/)
       const baseUrl = import.meta.env.BASE_URL || '/';
-      const musicPath = `${baseUrl}music/`.replace(/\/\//g, '/');
+      this.musicPath = `${baseUrl}music/`.replace(/\/\//g, '/');
 
       // Try to fetch the track list from a manifest or scan directory
       // Since we can't dynamically scan directories in browser, we'll use a different approach:
       // The user can put tracks in public/music/ and we'll try common names or use a manifest
 
       // First try to load a manifest file
-      const manifestResponse = await fetch(`${musicPath}playlist.json`).catch(() => null);
+      const manifestResponse = await fetch(`${this.musicPath}playlist.json`).catch(() => null);
 
       if (manifestResponse?.ok) {
         const manifest = await manifestResponse.json();
         this.tracks = manifest.tracks.map((name: string) => ({
           name: name.replace(/\.mp3$/i, ''),
-          url: `${musicPath}${name}`,
+          url: `${this.musicPath}${name}`,
           audio: null,
         }));
+
+        // Load special tracks if defined
+        if (manifest.special) {
+          this.specialTracks = manifest.special;
+        }
       } else {
         // No manifest - try to detect tracks by attempting to load them
         // This is a fallback approach that tries numbered tracks
@@ -197,8 +210,8 @@ export class MusicManager {
     audio.volume = this.config.volume;
     audio.preload = 'auto';
 
-    // Set up ended event for auto-advance
-    audio.addEventListener('ended', () => this.onTrackEnded());
+    // Set up ended event for auto-advance (using bound method for cleanup)
+    audio.addEventListener('ended', this.onTrackEndedBound);
 
     return audio;
   }
@@ -254,9 +267,17 @@ export class MusicManager {
   }
 
   /**
-   * Pause music playback
+   * Pause music playback (both regular and special)
    */
   pause(): void {
+    // Pause special audio if playing
+    if (this.isPlayingSpecial && this.specialAudio) {
+      this.specialAudio.pause();
+      this.isPaused = true;
+      return;
+    }
+
+    // Pause regular audio
     if (!this.isPlaying || !this.currentAudio) return;
 
     this.isPaused = true;
@@ -264,10 +285,20 @@ export class MusicManager {
   }
 
   /**
-   * Resume music playback
+   * Resume music playback (both regular and special)
    */
   async resume(): Promise<void> {
-    if (!this.isPaused || !this.currentAudio) return;
+    if (!this.isPaused) return;
+
+    // Resume special audio if it was playing
+    if (this.isPlayingSpecial && this.specialAudio) {
+      this.isPaused = false;
+      await this.specialAudio.play().catch((e) => console.warn('Special music resume failed:', e));
+      return;
+    }
+
+    // Resume regular audio
+    if (!this.currentAudio) return;
 
     this.isPaused = false;
     await this.currentAudio.play().catch((e) => console.warn('Music resume failed:', e));
@@ -277,16 +308,88 @@ export class MusicManager {
    * Stop music playback
    */
   stop(): void {
+    // Cancel any ongoing crossfade
+    if (this.crossfadeInterval) {
+      clearInterval(this.crossfadeInterval);
+      this.crossfadeInterval = null;
+    }
+    this.isCrossfading = false;
+
+    // Stop current audio
     if (this.currentAudio) {
       this.currentAudio.pause();
       this.currentAudio.currentTime = 0;
+      // Remove event listener to prevent auto-advance
+      this.currentAudio.removeEventListener('ended', this.onTrackEndedBound);
+      this.currentAudio = null;
     }
+
+    // Stop next audio (used during crossfade)
     if (this.nextAudio) {
       this.nextAudio.pause();
       this.nextAudio.currentTime = 0;
+      this.nextAudio.removeEventListener('ended', this.onTrackEndedBound);
+      this.nextAudio = null;
     }
+
     this.isPlaying = false;
     this.isPaused = false;
+    this.currentTrackIndex = -1;
+  }
+
+  /**
+   * Play a special track (high score, game over, etc.)
+   * Stops regular music and plays the special track
+   */
+  async playSpecial(type: 'highScore' | 'gameOver' | 'menu'): Promise<void> {
+    if (!this.config.enabled) return;
+
+    const trackName = this.specialTracks[type];
+    if (!trackName) {
+      console.log(`Music Manager: No special track configured for '${type}'`);
+      return;
+    }
+
+    // Stop regular music
+    this.stop();
+    this.stopSpecial();
+
+    // Create and play special track
+    const url = `${this.musicPath}${trackName}`;
+    this.specialAudio = new Audio(url);
+    this.specialAudio.volume = this.config.volume;
+    this.specialAudio.loop = true;
+
+    this.isPlayingSpecial = true;
+    console.log(`Playing special track: ${trackName}`);
+
+    await this.specialAudio.play().catch((e) => {
+      console.warn(`Failed to play special track '${type}':`, e);
+      this.isPlayingSpecial = false;
+    });
+  }
+
+  /**
+   * Stop special track and optionally resume regular music
+   */
+  stopSpecial(resumeRegular: boolean = false): void {
+    if (this.specialAudio) {
+      this.specialAudio.pause();
+      this.specialAudio.currentTime = 0;
+      this.specialAudio = null;
+    }
+    this.isPlayingSpecial = false;
+
+    if (resumeRegular) {
+      this.play();
+    }
+  }
+
+  /**
+   * Check if playing a special track
+   */
+  getIsPlayingSpecial(): boolean {
+    return this.isPlayingSpecial;
   }
 
   /**
@@ -387,6 +490,9 @@ export class MusicManager {
     }
     if (this.nextAudio) {
       this.nextAudio.volume = this.config.volume;
+    }
+    if (this.specialAudio) {
+      this.specialAudio.volume = this.config.volume;
     }
   }
 
