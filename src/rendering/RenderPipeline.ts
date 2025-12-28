@@ -16,6 +16,7 @@ import { MainMenu } from '../ui/MainMenu';
 import { SettingsMenu } from '../ui/SettingsMenu';
 import { NameEntryDialog } from '../ui/NameEntryDialog';
 import { LeaderboardDisplay } from '../ui/LeaderboardDisplay';
+import { TouchControls } from '../ui/TouchControls';
 import { GameModeType } from '../core/types/gameState';
 import { ChaosModifiers } from '../core/chaos/ChaosManager';
 
@@ -110,6 +111,7 @@ export class RenderPipeline {
   private screenEffects: ScreenEffects | null = null;
   private crtFilter: CRTFilter | null = null;
   private crtEnabled: boolean = true;
+  private isMobileDevice: boolean = false;
 
   // Lock flash tracking
   private lockFlashCells: { x: number; y: number; time: number; color: number }[] = [];
@@ -155,9 +157,22 @@ export class RenderPipeline {
     onLeaderboardClose?: () => void;
   } = {};
 
+  // Touch controls for mobile
+  private touchControls: TouchControls | null = null;
+
   constructor(config: Partial<RenderConfig> = {}) {
     this.config = { ...DEFAULT_RENDER_CONFIG, ...config };
     this.app = new Application();
+
+    // Detect mobile device
+    this.isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                          ('ontouchstart' in window);
+
+    // Disable CRT effect on mobile by default for better performance
+    if (this.isMobileDevice) {
+      this.crtEnabled = false;
+      this.config.glowEnabled = false; // Also disable glow on mobile
+    }
 
     // Initialize containers
     this.backgroundLayer = new Container();
@@ -239,6 +254,12 @@ export class RenderPipeline {
 
     // Setup UI
     this.setupUI();
+
+    // Initialize touch controls
+    this.touchControls = new TouchControls();
+    this.touchControls.layout(this.config.width, this.config.height);
+    // Add touch controls layer after menu layer (on top)
+    this.app.stage.addChild(this.touchControls.getContainer());
 
     // Draw static elements
     this.drawGrid();
@@ -1121,7 +1142,65 @@ export class RenderPipeline {
       this.synthwaveBackground.resize(width, height);
     }
 
+    // Update CRT filter resolution
+    if (this.crtFilter) {
+      this.crtFilter.setResolution(width, height);
+    }
+
+    // Update screen effects
+    if (this.screenEffects) {
+      // Screen effects might need resize update - would need to add method
+    }
+
+    // Relayout menus
+    if (this.mainMenu) {
+      this.mainMenu.layout(width, height);
+    }
+    if (this.settingsMenu) {
+      this.settingsMenu.layout(width, height);
+    }
+
+    // Relayout touch controls if they exist
+    if (this.touchControls) {
+      this.touchControls.layout(width, height);
+    }
+
+    // Redraw static elements
     this.drawGrid();
+  }
+
+  /**
+   * Handle window resize - calculates optimal canvas size
+   */
+  handleResize(): void {
+    const container = this.app.canvas.parentElement;
+    if (!container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    // Calculate optimal size maintaining aspect ratio
+    const targetAspect = 16 / 9;
+    let width = containerWidth;
+    let height = width / targetAspect;
+
+    // If height exceeds container, constrain by height instead
+    if (height > containerHeight) {
+      height = containerHeight;
+      width = height * targetAspect;
+    }
+
+    // Ensure minimum size for mobile
+    const minWidth = 375;
+    const minHeight = minWidth / targetAspect;
+
+    if (width < minWidth) {
+      width = minWidth;
+      height = minHeight;
+    }
+
+    // Resize renderer
+    this.resize(Math.floor(width), Math.floor(height));
   }
 
   /**
@@ -1146,13 +1225,21 @@ export class RenderPipeline {
   }
 
   /**
+   * Get touch controls
+   */
+  getTouchControls(): TouchControls | null {
+    return this.touchControls;
+  }
+
+  /**
    * Initialize menus with callbacks
    */
   initMenus(
     onStartGame: (mode: GameModeType) => void,
     onSFXVolumeChange: (volume: number) => void,
     onMusicVolumeChange: (volume: number) => void,
-    onCRTToggle: () => void
+    onCRTToggle: () => void,
+    onToggleFullscreen?: () => void
   ): void {
     this.menuCallbacks.onStartGame = onStartGame;
     this.menuCallbacks.onSFXVolumeChange = onSFXVolumeChange;
@@ -1188,6 +1275,7 @@ export class RenderPipeline {
         // Show leaderboard overlay
         this.showLeaderboard();
       },
+      onToggleFullscreen: onToggleFullscreen,
     });
     this.mainMenu.layout(this.config.width, this.config.height);
     this.menuLayer.addChild(this.mainMenu.getContainer());
@@ -1225,6 +1313,10 @@ export class RenderPipeline {
       this.boardLayer.visible = false;
       this.pieceLayer.visible = false;
       this.uiLayer.visible = false;
+      // Hide touch controls in menu
+      if (this.touchControls) {
+        this.touchControls.hide();
+      }
     }
   }
 
@@ -1239,6 +1331,10 @@ export class RenderPipeline {
       this.boardLayer.visible = true;
       this.pieceLayer.visible = true;
       this.uiLayer.visible = true;
+      // Show touch controls when game starts
+      if (this.touchControls && this.touchControls.isMobile()) {
+        this.touchControls.show();
+      }
     }
   }
 

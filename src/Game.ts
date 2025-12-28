@@ -20,6 +20,7 @@ import { AudioManager, getAudioManager } from './audio/AudioManager';
 import { MusicManager, getMusicManager } from './audio/MusicManager';
 import { ChaosManager, getChaosManager, ChaosModifiers } from './core/chaos/ChaosManager';
 import { getLeaderboard, Leaderboard } from './storage/Leaderboard';
+import { FullscreenManager, getFullscreenManager } from './utils/Fullscreen';
 
 /**
  * Game options
@@ -52,6 +53,7 @@ export class Game {
     windDirection: 0,
   };
   private leaderboard: Leaderboard;
+  private fullscreenManager: FullscreenManager | null = null;
 
   // App phase (menu vs playing)
   private appPhase: 'menu' | 'playing' = 'menu';
@@ -157,6 +159,27 @@ export class Game {
   }
 
   /**
+   * Toggle fullscreen mode
+   */
+  async toggleFullscreen(): Promise<void> {
+    if (this.fullscreenManager) {
+      try {
+        await this.fullscreenManager.toggle();
+        console.log('Fullscreen toggled:', this.fullscreenManager.isFullscreen());
+      } catch (error) {
+        console.error('Failed to toggle fullscreen:', error);
+      }
+    }
+  }
+
+  /**
+   * Handle window resize
+   */
+  handleResize(): void {
+    this.renderer.handleResize();
+  }
+
+  /**
    * Toggle debug panel
    */
   toggleDebug(): void {
@@ -255,6 +278,9 @@ export class Game {
     // Initialize renderer
     await this.renderer.init(container);
 
+    // Initialize fullscreen manager
+    this.fullscreenManager = getFullscreenManager(document.documentElement);
+
     // Initialize input
     this.inputManager.init();
 
@@ -294,7 +320,8 @@ export class Game {
       (mode) => this.startGameWithMode(mode),
       (volume) => this.audioManager.setVolume(volume),
       (volume) => this.musicManager.setVolume(volume),
-      () => this.toggleCRT()
+      () => this.toggleCRT(),
+      () => this.toggleFullscreen()
     );
 
     // Initialize leaderboard UI
@@ -689,6 +716,23 @@ export class Game {
       if (this.accumulator >= effectiveTimestep) {
         // Get input actions ONLY when updating - prevents consuming inputs that won't be processed
         let actions = this.inputManager.update(this.accumulator);
+
+        // Merge touch controls input if available
+        const touchControls = this.renderer.getTouchControls();
+        if (touchControls && touchControls.isVisible()) {
+          const touchActions = touchControls.update(this.accumulator);
+          // Merge actions with OR logic (if either input source says true, use true)
+          actions = {
+            moveLeft: actions.moveLeft || touchActions.moveLeft,
+            moveRight: actions.moveRight || touchActions.moveRight,
+            softDrop: actions.softDrop || touchActions.softDrop,
+            hardDrop: actions.hardDrop || touchActions.hardDrop,
+            rotateCW: actions.rotateCW || touchActions.rotateCW,
+            rotateCCW: actions.rotateCCW || touchActions.rotateCCW,
+            rotate180: actions.rotate180 || touchActions.rotate180,
+            hold: actions.hold || touchActions.hold,
+          };
+        }
 
         // Apply chaos modifiers to input
         if (this.chaosModifiers.controlsReversed) {

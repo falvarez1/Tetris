@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Tetris VFX</title>
     <!-- Google Fonts - Retro game fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,6 +20,10 @@
         height: 100%;
         overflow: hidden;
         background-color: #0D0221;
+        overscroll-behavior: none;
+        touch-action: none; /* Prevent zoom, scroll, context menu */
+        -webkit-user-select: none;
+        user-select: none;
       }
 
       #game-container {
@@ -28,6 +32,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        touch-action: manipulation; /* Allow touch but prevent zoom */
       }
 
       canvas {
