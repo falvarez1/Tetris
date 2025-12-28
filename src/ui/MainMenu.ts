@@ -18,6 +18,7 @@ export interface MainMenuCallbacks {
   onStartGame: (mode: GameModeType) => void;
   onOpenSettings: () => void;
   onOpenLeaderboard?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 /**
@@ -104,6 +105,7 @@ export class MainMenu {
       { label: 'CLASSIC', mode: 'classic' as GameModeType, desc: 'Standard Tetris' },
       { label: 'MARATHON', mode: 'marathon' as GameModeType, desc: 'Endless Mode' },
       { label: 'CHAOS', mode: 'chaos' as GameModeType, desc: 'Random Events!' },
+      { label: 'FULLSCREEN', action: 'fullscreen', desc: 'Toggle Fullscreen' },
       { label: 'LEADERBOARD', action: 'leaderboard', desc: 'High Scores' },
       { label: 'SETTINGS', action: 'settings', desc: 'Audio & Video' },
     ];
@@ -277,6 +279,10 @@ export class MainMenu {
     } else if (button.action === 'leaderboard') {
       if (this.callbacks.onOpenLeaderboard) {
         this.callbacks.onOpenLeaderboard();
+      }
+    } else if (button.action === 'fullscreen') {
+      if (this.callbacks.onToggleFullscreen) {
+        this.callbacks.onToggleFullscreen();
       }
     }
   }

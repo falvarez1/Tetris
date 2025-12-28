@@ -28,6 +28,9 @@ async function main(): Promise<void> {
     // Initialize (will show main menu)
     await game.init(container);
 
+    // Perform initial resize to fit container
+    game.handleResize();
+
     console.log('Tetris VFX initialized successfully!');
     console.log('Select a game mode from the menu to start playing!');
   } catch (error) {
@@ -37,7 +40,7 @@ async function main(): Promise<void> {
 
 // Handle window resize
 window.addEventListener('resize', () => {
-  // Renderer handles resize internally
+  game?.handleResize();
 });
 
 // Cleanup on page unload
